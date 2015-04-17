@@ -49,7 +49,7 @@ int main(void)
 #endif
            | _BV(WGM01)  | _BV(WGM00);  // Fast PWM mode 0x00-0xFF then overflow
     // Timer/Counter Control Register B
-    TCCR0B = _BV(CS01) | _BV(CS00);     // Counter started, f/8
+    TCCR0B = _BV(CS01) | _BV(CS00);     // Counter started, f/64
     // Timer/Counter Interrupt Mask Register
     TIMSK0 = _BV(TOIE0);                // Timer/Counter0 Overflow Int Enable
     OCR0A = 0;
