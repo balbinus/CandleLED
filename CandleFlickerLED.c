@@ -4,14 +4,6 @@
  * Emulates a candleflicker-LED on an AVR microcontroller.
  */
 
-#ifndef F_CPU
-#ifdef __AVR_ATtiny13__
-#define F_CPU 9600000
-#else
-#define F_CPU 16000000
-#endif
-#endif
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
@@ -35,6 +27,29 @@
 int main(void)
 {
     cli();
+    
+    /**
+     * CPU base frequency (fuses)     = 4.8 MHz
+     * CPU clock division factor      = 4
+     * CPU frequency                  = 1.2 MHz
+     * 
+     * Counter0 clock division factor = 8
+     * Counter0 steps                 = 256 (8 bits)
+     * Counter0 overflows in a frame  = 32
+     * 
+     * Hence:
+     * PWM change frequency           = 18,31 Hz
+     * PWM change period              = 54,61 ms
+     * 
+     * To avoid unintentional changes of clock frequency, a special write
+     * procedure must be followed to change the CLKPS bits:
+     * 1. Write the Clock Prescaler Change Enable (CLKPCE) bit to one and all 
+     * other bits in CLKPR to zero.
+     * 2. Within four cycles, write the desired value to CLKPS while writing a
+     * zero to CLKPCE.
+     */
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS1);                // Set clk division factor to 4
 	
     // Set output pin direction
 	LEDDDR |= _BV(LEDPIN);	            // LED is connected to PB0
@@ -47,7 +62,7 @@ int main(void)
 #endif
            | _BV(WGM01)  | _BV(WGM00);  // Fast PWM mode 0x00-0xFF then overflow
     // Timer/Counter Control Register B
-    TCCR0B = _BV(CS01) | _BV(CS00);     // Counter started, f/64
+    TCCR0B = _BV(CS01);                 // Counter started, f/8
     // Timer/Counter Interrupt Mask Register
     TIMSK0 = _BV(TOIE0);                // Timer/Counter0 Overflow Int Enable
     OCR0A = 0;
