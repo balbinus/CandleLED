@@ -14,13 +14,11 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/sleep.h>
-#include <util/delay.h>
 
 /**
  * This is a 32-bit long LFSR. The point is to decrease repetition in the
  * sequences, but it takes a toll on performance (slightly) and on program/
- * memory size.(see http://www.ece.cmu.edu/~koopman/lfsr/index.html on LFSRs).
+ * memory size (see http://www.ece.cmu.edu/~koopman/lfsr/index.html on LFSRs).
  * 
  * Values are inverted so the LFSR also works with zero initialization.
  */
@@ -31,7 +29,7 @@
 #define LEDDDR  DDRB
 #define LEDPIN  PB0
 
-// Select only the lowest byte
+// Select only the lowest byte (GCC ASM optim)
 #define low_byte(x) ((uint8_t) x)
 
 int main(void)
@@ -80,13 +78,10 @@ ISR(TIM0_OVF_vect)
      * Bad values are those whose bits 2 and 3 (0b1100) are not set. These
      * values will be too low for our flicker to work.
      * 
-     * In the end, we clamp the 5-bit random value to 4 bits so that 50% of the
-     * time, the LED is full on.
-     * 
      * (uint8_t) conversion (via low_byte()) is here to simplify asm code and
      * compare only on the byte we need. GCC can't see this optimization somehow.
      */
-    if (FRAME_CTR == 0 || (((FRAME_CTR & 0x07) == 0) && ((low_byte(RAND) & 0x18) == 0)))
+    if (FRAME_CTR == 0 || (((FRAME_CTR & 0x07) == 0) && ((low_byte(RAND) & 0xC) == 0)))
     {
         if ((RAND & 1) == 1) RAND >>= 1;
         else RAND = (RAND >> 1) ^ LFSR_FEEDBACK_TERM;
@@ -94,6 +89,13 @@ ISR(TIM0_OVF_vect)
 
     /**
      * Top of a frame: set the new PWM value from the generated randomness.
+     * 
+     * We saturate the 5-bit random value to 4 bits so that 50% of the time, the
+     * LED is full on.
+     * 
+     * The bit shift is here to fill the 8 bits of the PWM counter.
+     * 
+     * See above for low_byte().
      */
     if (FRAME_CTR == 0x1F)
     {

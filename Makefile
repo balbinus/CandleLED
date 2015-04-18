@@ -2,7 +2,7 @@
 MCU=attiny13
 
 CC=avr-gcc
-CFLAGS=-mmcu=$(MCU) -Wall -Os -D__32BIT_LFSR
+CFLAGS=-mmcu=$(MCU) -Wall -Os
 OBJCOPY=avr-objcopy
 SIZE=avr-size
 
