@@ -26,8 +26,8 @@ size: $(TARGET)
 
 upload: all
 ifeq ($(MCU),attiny13)
-	avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p attiny13 -v -e -U hfuse:w:0xFF:m -U lfuse:w:0x79:m
+	avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p $(MCU) -v -e -U hfuse:w:0xFF:m -U lfuse:w:0x79:m
 endif
-	avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p attiny13 -v -e -U flash:w:CandleFlickerLED.hex 
+	avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p $(MCU) -v -e -U flash:w:$(FIRMWARE)
 
 .PHONY: all debug-asm size upload

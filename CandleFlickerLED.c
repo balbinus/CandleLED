@@ -17,7 +17,6 @@
 #define LFSR_FEEDBACK_TERM 0x7FFFF159
 
 // Led connected to PB0
-#define LEDPORT PORTB
 #define LEDDDR  DDRB
 #define LEDPIN  PB0
 
