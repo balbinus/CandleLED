@@ -51,7 +51,7 @@ int main(void)
     CLKPR = _BV(CLKPS1);                // Set clk division factor to 4
 	
     // Set output pin direction
-	LEDDDR |= _BV(LEDPIN);	            // LED is connected to PB0
+    LEDDDR |= _BV(LEDPIN);	            // LED is connected to PB0
     
     // Timer/Counter Control Register A
 #ifdef __INVERTED_PWM
