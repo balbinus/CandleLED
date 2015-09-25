@@ -2,7 +2,7 @@
 MCU=attiny13
 
 CC=avr-gcc
-CFLAGS=-mmcu=$(MCU) -Wall -Os -DF_CPU=1200000
+CFLAGS=-mmcu=$(MCU) -Wpedantic -Wall -Os -DF_CPU=1200000 -std=c99
 OBJCOPY=avr-objcopy
 SIZE=avr-size
 
