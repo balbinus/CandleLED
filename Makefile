@@ -5,6 +5,7 @@ CC=avr-gcc
 CFLAGS=-mmcu=$(MCU) -Wpedantic -Wall -Os -DF_CPU=1200000 -std=c99
 OBJCOPY=avr-objcopy
 SIZE=avr-size
+NM=avr-nm
 
 SOURCE=CandleFlickerLED.c
 TARGET=$(SOURCE:.c=.elf)
@@ -17,6 +18,7 @@ debug-asm: $(SOURCE)
 	
 size: $(TARGET)
 	$(SIZE) -C --mcu=$(MCU) $^
+	$(NM) --size-sort -C -t d $^
 
 %.hex: %.elf
 	$(OBJCOPY) $< $@
