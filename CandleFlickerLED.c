@@ -89,7 +89,7 @@ ISR(TIM0_OVF_vect)
      * if the number we've generated is deemed invalid, we retry up to three
      * times to make a new one (& 0x07).
      * 
-     * Bad values are those whose bits 2 and 3 (0b1100) are not set. These
+     * Bad values are those whose bits 2 and 3 (0b1100 = 0xC) are not set. These
      * values will be too low for our flicker to work.
      * 
      * (uint8_t) conversion (via low_byte()) is here to simplify asm code and
