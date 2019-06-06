@@ -4,6 +4,7 @@ MCU:=attiny13
 CC=avr-gcc
 CFLAGS=-mmcu=$(MCU) -Wpedantic -Wall -Os -DF_CPU=1200000 -std=c99
 OBJCOPY=avr-objcopy
+OBJDUMP=avr-objdump
 SIZE=avr-size
 NM=avr-nm
 
@@ -21,7 +22,7 @@ debug-asm: $(DISASM)
 	$(CC) $(CFLAGS) -S -o $@ $<
 
 %.asm: %.hex
-	LANG=C avr-objdump -s -m avr25 -d $< > $@
+	LANG=C $(OBJDUMP) -s -m avr25 -d $< > $@
 
 size: $(TARGET)
 	$(SIZE) -C --mcu=$(MCU) $^

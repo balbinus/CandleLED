@@ -26,9 +26,6 @@
 // Select only the lowest byte (GCC ASM optim)
 #define low_byte(x) ((uint8_t) x)
 
-uint8_t  FRAME_CTR = 0;
-uint32_t RAND      = 0;
-
 int main(void)
 {
     cli();
@@ -71,10 +68,26 @@ int main(void)
     // Timer/Counter Interrupt Mask Register
     TIMSK0 = _BV(TOIE0);                // Timer/Counter0 Overflow Int Enable
     OCR0A = 0;
-    
+
+    MCUCR = _BV(SE);                    // Sleep Enable, SM = 0 (Idle), PUD = ISC = 0.
+
+    __asm__(
+            "mov r20,r1" "\n\t"
+            "mov r21,r1" "\n\t"
+            "mov r22,r1" "\n\t"
+            "mov r23,r1" "\n\t"
+            "mov r24,r1"
+            : /* no output registers */
+            : /* no input registers */
+            : "r20", "r21", "r22", "r23", "r24"
+           );
+
     sei();
     
-    while (1);
+    while (1)
+    {
+        __asm__("sleep");
+    }
 }
 
 /**
@@ -87,104 +100,80 @@ int main(void)
  * interrupts), we don't really care about the registers state. We need to call
  * reti ourselves, though, since it's part of the epilogue.
  */
- __attribute__((naked)) ISR(TIM0_OVF_vect)
+__attribute__((naked)) ISR(TIM0_OVF_vect)
 {
-/*
-    FRAME_CTR++;
-    FRAME_CTR &= 0x1F;
-*/
-    /**
-     * Generate a new random brightness value at the bottom of each frame, and
-     * if the number we've generated is deemed invalid, we retry up to three
-     * times to make a new one (& 0x07).
-     * 
-     * Bad values are those whose bits 2 and 3 (0b1100 = 0xC) are not set. These
-     * values will be too low for our flicker to work.
-     * 
-     * (uint8_t) conversion (via low_byte()) is here to simplify asm code and
-     * compare only on the byte we need.
-     * 
-     * We use inline Assembly because GCC will add unnecessary MOVW & loads.
-     */
-/*
-    if (FRAME_CTR == 0 || (((FRAME_CTR & 0x7) == 0) && ((low_byte(RAND) & 0xC) == 0)))
-    {
-        if ((RAND & 1) == 1) RAND >>= 1;
-        else RAND = (RAND >> 1) ^ LFSR_FEEDBACK_TERM;
-    }
-*/
-    /**
-     * Top of a frame: set the new PWM value from the generated randomness.
-     * 
-     * We saturate the 5-bit random value to 4 bits so that 50% of the time, the
-     * LED is full on.
-     * 
-     * The bit shift is here to fill the 8 bits of the PWM counter.
-     * 
-     * See above for low_byte().
-     */
-/*
-    if (FRAME_CTR == 0x1F)
-    {
-        OCR0A = (low_byte(RAND) & 0x10) > 0 ? 0xFF : (low_byte(RAND) << 4) | 0xF;
-    }
-
-    reti(); // needed if naked.
-*/
-
     __asm__(
-            "subi %1,lo8(-(1))" "\n\t" // FRAME_CTR++
-            "andi %1,0x1F" "\n\t" // FRAME_CTR &= 0x1F
+            /**
+             * Increment frame counter.
+             */
+            "inc r24" "\n\t"            // FRAME_CTR++
+            "andi r24,0x1F" "\n\t"      // FRAME_CTR &= 0x1F
 
-            "mov r31,%1" "\n\t"
-            "tst %1" "\n\t"         // if (FRAME_CTR == 0) goto NEW_RAND
+            /**
+             * Generate a new random brightness value at the bottom of each frame, and
+             * if the number we've generated is deemed invalid, we retry up to three
+             * times to make a new one (0b00000 + ~0x07 = 0b01000, 0b10000, 0b11000).
+             * 
+             * Bad values are those whose bits 2 and 3 (0b1100 = 0xC) are not set. These
+             * values will be too low for our flicker to work.
+             */
+            "mov r31,r24" "\n\t"
+            "tst r24" "\n\t"            // if (FRAME_CTR == 0) goto NEW_RAND
             "breq .LNEW_RAND" "\n\t"
-            "andi r31,lo8(7)" "\n\t" // if ((FRAME_CTR & 0x7) != 0) goto NEW_PWM
+            "andi r31,lo8(7)" "\n\t"    // if ((FRAME_CTR & 0x7) != 0) goto NEW_PWM
             "brne .LNEW_PWM" "\n\t"
-            "mov r31,%A0" "\n\t"
-            "andi r31,lo8(12)" "\n\t" // if ((RAND & 0xC) != 0) goto NEW_PWM
+            "mov r31,r20" "\n\t"
+            "andi r31,lo8(12)" "\n\t"   // if ((RAND & 0xC) != 0) goto NEW_PWM
             "brne .LNEW_PWM" "\n"
 
         ".LNEW_RAND:" "\n\t"
-            "mov r31,%A0" "\n\t"
-            "lsr %D0" "\n\t"    // RAND >>= 1
-            "ror %C0" "\n\t"
-            "ror %B0" "\n\t"
-            "ror %A0" "\n\t"
+            "mov r31,r20" "\n\t"
+            "lsr r23" "\n\t"            // RAND >>= 1
+            "ror r22" "\n\t"
+            "ror r21" "\n\t"
+            "ror r20" "\n\t"
 
-            "sbrc r31,0" "\n\t"  // if !(old_RAND & 1) goto NEW_PWM
+            "sbrc r31,0" "\n\t"         // if !(old_RAND & 1) goto NEW_PWM
             "rjmp .LNEW_PWM" "\n\t"
 
-            "ldi r31,0x59" "\n\t"   // RAND ^= LFSR_FEEDBACK_TERM
-            "eor %A0,r31" "\n\t"
+            "ldi r31,0x59" "\n\t"       // RAND ^= LFSR_FEEDBACK_TERM
+            "eor r20,r31" "\n\t"
             "ldi r31,0xF1" "\n\t"
-            "eor %B0,r31" "\n\t"
+            "eor r21,r31" "\n\t"
             //~ "ldi r31,0xFF" "\n\t"
-            //~ "eor %C0,r31" "\n\t"
-            "com %C0" "\n\t"
+            //~ "eor r22,r31" "\n\t"
+            "com r22" "\n\t"
             "ldi r31,0x7F" "\n\t"
-            "eor %D0,r31" "\n"
+            "eor r23,r31" "\n"
 
         ".LNEW_PWM:" "\n\t"
-            "cpi %1,0x1F" "\n\t" // if (FRAME_CTR != 0x1F) reti;
+            /**
+             * Top of a frame (0x1F): set the new PWM value from the generated RAND.
+             * 
+             * We saturate the 5-bit random value to 4 bits so that 50% of the time,
+             * the LED is full on.
+             * 
+             * The bit shift is here to fill the 8 bits of the PWM counter.
+             */
+            "cpi r24,0x1F" "\n\t"       // if (FRAME_CTR != 0x1F) reti;
             "brne .LRETI" "\n\t"
 
             "ldi r31,0xFF" "\n\t"
-            "sbrc %A0,4" "\n\t" // if (RAND & 0x10) PWM = 0xFF;
+            "sbrc r20,4" "\n\t"         // if (RAND & 0x10) PWM = 0xFF;
             "rjmp .LSET_PWM" "\n\t"
 
-            "mov r31,%A0" "\n\t" // else PWM = (low_byte(RAND) << 4) | 0xF
+            "mov r31,r20" "\n\t"        // else PWM = (low_byte(RAND) << 4) | 0xF
             "swap r31" "\n\t"
-            "ori r31,0x0F" "\n" // 0x0F
+            "ori r31,0x0F" "\n"
 
         ".LSET_PWM:" "\n\t"
-            "out %4,r31" "\n"
+            "out %0,r31" "\n"           // OCR0A = PWM
 
-        ".LRETI:"
+        ".LRETI:" "\n\t"
+            "reti"
 
-            : "=r" (RAND), "=r" (FRAME_CTR)
-            : "0" (RAND), "1" (FRAME_CTR), "I" (_SFR_IO_ADDR(OCR0A))
-            : "r31"
+            : /* no output registers */
+            : "I" (_SFR_IO_ADDR(OCR0A))
+            : "r20", "r21", "r22", "r23", "r24", "r31"
            );
-    reti(); // has to be out of the block because of variables
 }
