@@ -14,7 +14,8 @@ TARGET=$(SOURCE:.c=.elf)
 FIRMWARE=$(TARGET:.elf=.hex)
 DISASM=$(FIRMWARE:.hex=.asm)
 
-all: $(FIRMWARE) size
+all: $(FIRMWARE) size debug
+debug: debug-s debug-asm
 debug-s: $(SOURCE_S)
 debug-asm: $(DISASM)
 
@@ -43,4 +44,4 @@ endif
 clean:
 	-rm -v $(TARGET) $(FIRMWARE)
 
-.PHONY: all debug-asm size upload clean
+.PHONY: all debug debug-s debug-asm size upload clean

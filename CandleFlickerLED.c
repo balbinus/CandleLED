@@ -12,16 +12,16 @@
  * sequences, but it takes a toll on performance (slightly) and on program/
  * memory size (see http://www.ece.cmu.edu/~koopman/lfsr/index.html on LFSRs).
  * 
- * Values are inverted so the LFSR also works with zero initialization.
- * 
- * (Ended up inlined in Assembly, because of the 0xFF = 1's complement
- * optimization).
+ * Values are inverted so the LFSR works with zero initialization.
  */
 #define LFSR_FEEDBACK_TERM 0x7FFFF159
 
 // Led connected to PB0
 #define LEDDDR  DDRB
 #define LEDPIN  PB0
+
+#define XSTRINGIFY(x) #x
+#define STRINGIFY(x) XSTRINGIFY(x)
 
 // Select only the lowest byte (GCC ASM optim)
 #define low_byte(x) ((uint8_t) x)
@@ -72,18 +72,18 @@ int main(void)
     MCUCR = _BV(SE);                    // Sleep Enable, SM = 0 (Idle), PUD = ISC = 0.
 
     __asm__(
-            "mov r20,r1" "\n\t"
-            "mov r21,r1" "\n\t"
-            "mov r22,r1" "\n\t"
-            "mov r23,r1" "\n\t"
-            "mov r24,r1"
+            "mov r20,__zero_reg__" "\n\t"
+            "mov r21,__zero_reg__" "\n\t"
+            "mov r22,__zero_reg__" "\n\t"
+            "mov r23,__zero_reg__" "\n\t"
+            "mov r24,__zero_reg__"
             : /* no output registers */
             : /* no input registers */
             : "r20", "r21", "r22", "r23", "r24"
            );
 
     sei();
-    
+
     while (1)
     {
         __asm__("sleep");
@@ -136,15 +136,36 @@ __attribute__((naked)) ISR(TIM0_OVF_vect)
             "sbrc r31,0" "\n\t"         // if !(old_RAND & 1) goto NEW_PWM
             "rjmp .LNEW_PWM" "\n\t"
 
-            "ldi r31,0x59" "\n\t"       // RAND ^= LFSR_FEEDBACK_TERM
+            // RAND ^= LFSR_FEEDBACK_TERM
+#if ((LFSR_FEEDBACK_TERM) & 0xFF) == 0xFF
+            "com r20" "\n\t"
+#elif ((LFSR_FEEDBACK_TERM) & 0xFF) == 0x00
+#else
+            "ldi r31," STRINGIFY((LFSR_FEEDBACK_TERM) & 0xFF) "\n\t"
             "eor r20,r31" "\n\t"
-            "ldi r31,0xF1" "\n\t"
+#endif
+#if ((LFSR_FEEDBACK_TERM >> 8) & 0xFF) == 0xFF
+            "com r21" "\n\t"
+#elif ((LFSR_FEEDBACK_TERM >> 8) & 0xFF) == 0x00
+#else
+            "ldi r31," STRINGIFY((LFSR_FEEDBACK_TERM >> 8) & 0xFF) "\n\t"
             "eor r21,r31" "\n\t"
-            //~ "ldi r31,0xFF" "\n\t"
-            //~ "eor r22,r31" "\n\t"
+#endif
+#if ((LFSR_FEEDBACK_TERM >> 16) & 0xFF) == 0xFF
             "com r22" "\n\t"
-            "ldi r31,0x7F" "\n\t"
-            "eor r23,r31" "\n"
+#elif ((LFSR_FEEDBACK_TERM >> 16) & 0xFF) == 0x00
+#else
+            "ldi r31," STRINGIFY((LFSR_FEEDBACK_TERM >> 16) & 0xFF) "\n\t"
+            "eor r22,r31" "\n\t"
+#endif
+#if ((LFSR_FEEDBACK_TERM >> 24) & 0xFF) == 0xFF
+            "com r23" "\n\t"
+#elseif ((LFSR_FEEDBACK_TERM >> 24) & 0xFF) == 0x00
+#else
+            "ldi r31," STRINGIFY((LFSR_FEEDBACK_TERM >> 24) & 0xFF) "\n\t"
+            "eor r23,r31" "\n\t"
+#endif
+            "\n"
 
         ".LNEW_PWM:" "\n\t"
             /**
